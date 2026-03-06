@@ -27,3 +27,21 @@ Thumbs.db
 
 # Env files
 .env
+# Local tool caches
+.local/
+
+# Frontend dependencies/build
+src/web/node_modules/
+src/web/dist/
+src/web/vite.out.log
+src/web/vite.err.log
+
+# Python cache
+src/ai-service/app/__pycache__/
+
+# Dotnet build outputs
+src/gateway/Zta.Gateway/bin/
+src/gateway/Zta.Gateway/obj/
+
+# Local sqlite runtime db files
+src/gateway/Zta.Gateway/*.db
