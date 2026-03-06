@@ -1,0 +1,512 @@
+[
+  {
+    "subject": "s002",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.0040344788728701,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.33945,
+    "auc_reconstruction_error": 0.9180118749999998,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s002.joblib"
+  },
+  {
+    "subject": "s003",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.8686171496700197,
+    "genuine_above_threshold_rate": 0.1,
+    "impostor_above_threshold_rate": 0.36785,
+    "auc_reconstruction_error": 0.8516275,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s003.joblib"
+  },
+  {
+    "subject": "s004",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.9241572099325266,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.6354,
+    "auc_reconstruction_error": 0.9523531250000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s004.joblib"
+  },
+  {
+    "subject": "s005",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.3710869129195105,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.44295,
+    "auc_reconstruction_error": 0.9402731249999999,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s005.joblib"
+  },
+  {
+    "subject": "s007",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.924385993885975,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.56415,
+    "auc_reconstruction_error": 0.91605875,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s007.joblib"
+  },
+  {
+    "subject": "s008",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.865780707336645,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.54645,
+    "auc_reconstruction_error": 0.92513375,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s008.joblib"
+  },
+  {
+    "subject": "s010",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.907691955959196,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.922,
+    "auc_reconstruction_error": 0.9925425,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s010.joblib"
+  },
+  {
+    "subject": "s011",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.2239658301403296,
+    "genuine_above_threshold_rate": 0.025,
+    "impostor_above_threshold_rate": 0.29895,
+    "auc_reconstruction_error": 0.8803768750000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s011.joblib"
+  },
+  {
+    "subject": "s012",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.9698415466609975,
+    "genuine_above_threshold_rate": 0.025,
+    "impostor_above_threshold_rate": 0.25145,
+    "auc_reconstruction_error": 0.9075837500000002,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s012.joblib"
+  },
+  {
+    "subject": "s013",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.945198698735789,
+    "genuine_above_threshold_rate": 0.0875,
+    "impostor_above_threshold_rate": 0.78675,
+    "auc_reconstruction_error": 0.945375,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s013.joblib"
+  },
+  {
+    "subject": "s015",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.1348107479773735,
+    "genuine_above_threshold_rate": 0.0625,
+    "impostor_above_threshold_rate": 0.5118,
+    "auc_reconstruction_error": 0.877345625,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s015.joblib"
+  },
+  {
+    "subject": "s016",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.9462904286279235,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.41315,
+    "auc_reconstruction_error": 0.92050625,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s016.joblib"
+  },
+  {
+    "subject": "s017",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.0096317950522506,
+    "genuine_above_threshold_rate": 0.025,
+    "impostor_above_threshold_rate": 0.96515,
+    "auc_reconstruction_error": 0.997295625,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s017.joblib"
+  },
+  {
+    "subject": "s018",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.2860305256224538,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.2398,
+    "auc_reconstruction_error": 0.84194375,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s018.joblib"
+  },
+  {
+    "subject": "s019",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.0585075932667514,
+    "genuine_above_threshold_rate": 0.025,
+    "impostor_above_threshold_rate": 0.803,
+    "auc_reconstruction_error": 0.984251875,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s019.joblib"
+  },
+  {
+    "subject": "s020",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.7856549266362877,
+    "genuine_above_threshold_rate": 0.0875,
+    "impostor_above_threshold_rate": 0.2315,
+    "auc_reconstruction_error": 0.77778375,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s020.joblib"
+  },
+  {
+    "subject": "s021",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.2102853886311857,
+    "genuine_above_threshold_rate": 0.0125,
+    "impostor_above_threshold_rate": 0.33015,
+    "auc_reconstruction_error": 0.9307287500000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s021.joblib"
+  },
+  {
+    "subject": "s022",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.310964531733817,
+    "genuine_above_threshold_rate": 0.0125,
+    "impostor_above_threshold_rate": 0.92685,
+    "auc_reconstruction_error": 0.99330375,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s022.joblib"
+  },
+  {
+    "subject": "s024",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.2663167217684475,
+    "genuine_above_threshold_rate": 0.0125,
+    "impostor_above_threshold_rate": 0.9304,
+    "auc_reconstruction_error": 0.9952631249999999,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s024.joblib"
+  },
+  {
+    "subject": "s025",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.2275797553127301,
+    "genuine_above_threshold_rate": 0.05,
+    "impostor_above_threshold_rate": 0.7459,
+    "auc_reconstruction_error": 0.9476556250000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s025.joblib"
+  },
+  {
+    "subject": "s026",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.0492011277408757,
+    "genuine_above_threshold_rate": 0.0125,
+    "impostor_above_threshold_rate": 0.73785,
+    "auc_reconstruction_error": 0.979186875,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s026.joblib"
+  },
+  {
+    "subject": "s027",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.1047327787032186,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.44365,
+    "auc_reconstruction_error": 0.94079,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s027.joblib"
+  },
+  {
+    "subject": "s028",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.2195053528872304,
+    "genuine_above_threshold_rate": 0.0125,
+    "impostor_above_threshold_rate": 0.9364,
+    "auc_reconstruction_error": 0.996036875,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s028.joblib"
+  },
+  {
+    "subject": "s029",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.894186619099538,
+    "genuine_above_threshold_rate": 0.0625,
+    "impostor_above_threshold_rate": 0.76535,
+    "auc_reconstruction_error": 0.931943125,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s029.joblib"
+  },
+  {
+    "subject": "s030",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.1436085295850766,
+    "genuine_above_threshold_rate": 0.0625,
+    "impostor_above_threshold_rate": 0.31315,
+    "auc_reconstruction_error": 0.879603125,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s030.joblib"
+  },
+  {
+    "subject": "s031",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.8524746598029278,
+    "genuine_above_threshold_rate": 0.0625,
+    "impostor_above_threshold_rate": 0.3858,
+    "auc_reconstruction_error": 0.869435,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s031.joblib"
+  },
+  {
+    "subject": "s032",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.7626143212575823,
+    "genuine_above_threshold_rate": 0.05,
+    "impostor_above_threshold_rate": 0.2979,
+    "auc_reconstruction_error": 0.8206831250000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s032.joblib"
+  },
+  {
+    "subject": "s033",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.8963942748322404,
+    "genuine_above_threshold_rate": 0.0625,
+    "impostor_above_threshold_rate": 0.2118,
+    "auc_reconstruction_error": 0.8645775,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s033.joblib"
+  },
+  {
+    "subject": "s034",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.0477778158490885,
+    "genuine_above_threshold_rate": 0.0875,
+    "impostor_above_threshold_rate": 0.35175,
+    "auc_reconstruction_error": 0.8775287500000002,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s034.joblib"
+  },
+  {
+    "subject": "s035",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.7675834587629825,
+    "genuine_above_threshold_rate": 0.025,
+    "impostor_above_threshold_rate": 0.74155,
+    "auc_reconstruction_error": 0.9706075000000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s035.joblib"
+  },
+  {
+    "subject": "s036",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.0269228389598564,
+    "genuine_above_threshold_rate": 0.1125,
+    "impostor_above_threshold_rate": 0.99955,
+    "auc_reconstruction_error": 0.9980906249999999,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s036.joblib"
+  },
+  {
+    "subject": "s037",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 2.8117307233645668,
+    "genuine_above_threshold_rate": 0.0,
+    "impostor_above_threshold_rate": 0.19795,
+    "auc_reconstruction_error": 0.90088375,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s037.joblib"
+  },
+  {
+    "subject": "s038",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.9490995295550698,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.5597,
+    "auc_reconstruction_error": 0.909745625,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s038.joblib"
+  },
+  {
+    "subject": "s039",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.3970193508557256,
+    "genuine_above_threshold_rate": 0.025,
+    "impostor_above_threshold_rate": 0.60525,
+    "auc_reconstruction_error": 0.9720043749999999,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s039.joblib"
+  },
+  {
+    "subject": "s040",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.7345672237357436,
+    "genuine_above_threshold_rate": 0.0625,
+    "impostor_above_threshold_rate": 0.4791,
+    "auc_reconstruction_error": 0.9159531249999999,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s040.joblib"
+  },
+  {
+    "subject": "s041",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.2939425530805129,
+    "genuine_above_threshold_rate": 0.025,
+    "impostor_above_threshold_rate": 0.06475,
+    "auc_reconstruction_error": 0.7803625,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s041.joblib"
+  },
+  {
+    "subject": "s042",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.3351385349081026,
+    "genuine_above_threshold_rate": 0.025,
+    "impostor_above_threshold_rate": 0.75605,
+    "auc_reconstruction_error": 0.9808762499999999,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s042.joblib"
+  },
+  {
+    "subject": "s043",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.8950494099145222,
+    "genuine_above_threshold_rate": 0.05,
+    "impostor_above_threshold_rate": 0.98465,
+    "auc_reconstruction_error": 0.98180875,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s043.joblib"
+  },
+  {
+    "subject": "s044",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.9740312355983839,
+    "genuine_above_threshold_rate": 0.075,
+    "impostor_above_threshold_rate": 0.84705,
+    "auc_reconstruction_error": 0.9528768750000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s044.joblib"
+  },
+  {
+    "subject": "s046",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.1543500681013188,
+    "genuine_above_threshold_rate": 0.075,
+    "impostor_above_threshold_rate": 0.20075,
+    "auc_reconstruction_error": 0.8326768749999999,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s046.joblib"
+  },
+  {
+    "subject": "s047",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.8115390218034265,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.31905,
+    "auc_reconstruction_error": 0.892871875,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s047.joblib"
+  },
+  {
+    "subject": "s048",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.138143362195836,
+    "genuine_above_threshold_rate": 0.0125,
+    "impostor_above_threshold_rate": 0.481,
+    "auc_reconstruction_error": 0.931435625,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s048.joblib"
+  },
+  {
+    "subject": "s049",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.2632061073716443,
+    "genuine_above_threshold_rate": 0.0625,
+    "impostor_above_threshold_rate": 0.37335,
+    "auc_reconstruction_error": 0.9256793750000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s049.joblib"
+  },
+  {
+    "subject": "s050",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.9752313962029596,
+    "genuine_above_threshold_rate": 0.1125,
+    "impostor_above_threshold_rate": 0.601,
+    "auc_reconstruction_error": 0.8989262500000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s050.joblib"
+  },
+  {
+    "subject": "s051",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.9388354973941828,
+    "genuine_above_threshold_rate": 0.0125,
+    "impostor_above_threshold_rate": 0.60495,
+    "auc_reconstruction_error": 0.93147,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s051.joblib"
+  },
+  {
+    "subject": "s052",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.1176527314604436,
+    "genuine_above_threshold_rate": 0.05,
+    "impostor_above_threshold_rate": 0.94635,
+    "auc_reconstruction_error": 0.98756,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s052.joblib"
+  },
+  {
+    "subject": "s053",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.0877698656090973,
+    "genuine_above_threshold_rate": 0.0125,
+    "impostor_above_threshold_rate": 0.74345,
+    "auc_reconstruction_error": 0.9829668750000001,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s053.joblib"
+  },
+  {
+    "subject": "s054",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.142662829812561,
+    "genuine_above_threshold_rate": 0.05,
+    "impostor_above_threshold_rate": 0.433,
+    "auc_reconstruction_error": 0.896966875,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s054.joblib"
+  },
+  {
+    "subject": "s055",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 1.220764037553855,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.8777,
+    "auc_reconstruction_error": 0.981305625,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s055.joblib"
+  },
+  {
+    "subject": "s056",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.8006642357902408,
+    "genuine_above_threshold_rate": 0.0375,
+    "impostor_above_threshold_rate": 0.519,
+    "auc_reconstruction_error": 0.8819562499999999,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s056.joblib"
+  },
+  {
+    "subject": "s057",
+    "rows_subject": 400,
+    "rows_other": 20000,
+    "threshold": 0.9267649511862103,
+    "genuine_above_threshold_rate": 0.05,
+    "impostor_above_threshold_rate": 0.65365,
+    "auc_reconstruction_error": 0.909634375,
+    "model_path": "e:\\SAVED_CODES_AND_PROJECT\\code-playing\\ZTA_MODELS\\artifacts\\behavior_autoencoder\\models\\behavior_s057.joblib"
+  }
+]

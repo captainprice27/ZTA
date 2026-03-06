@@ -1,0 +1,8 @@
+# C# package install commands
+# Run from:
+#   e:\SAVED_CODES_AND_PROJECT\code-playing\ZTA\src\gateway\Zta.Gateway
+
+dotnet add package Microsoft.EntityFrameworkCore.SqlServer --version 10.0.0
+dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version 10.0.0
+dotnet add package Azure.Identity --version 1.14.2
+dotnet add package Azure.ResourceManager.Network --version 1.11.0

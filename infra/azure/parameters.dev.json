@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "sqlServerName": {
+      "value": "zta-sql-dev-001"
+    },
+    "sqlAdminLogin": {
+      "value": "ztaadmin"
+    },
+    "sqlAdminPassword": {
+      "value": "REPLACE_WITH_SECURE_PASSWORD"
+    },
+    "sqlDatabaseName": {
+      "value": "ZtaPolicy"
+    },
+    "nsgName": {
+      "value": "zta-gateway-nsg"
+    }
+  }
+}

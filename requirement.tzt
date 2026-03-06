@@ -1,0 +1,5 @@
+# Python package manifest (alias file as requested)
+# Use:
+#   pip install -r requirement.tzt
+
+-r src/ai-service/requirements.txt

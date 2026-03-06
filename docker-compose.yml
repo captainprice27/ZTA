@@ -1,0 +1,40 @@
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: zta-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: ${SA_PASSWORD:-Your_strong_password_123}
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+
+  ai-service:
+    build:
+      context: ./src/ai-service
+    container_name: zta-ai
+    ports:
+      - "8000:8000"
+
+  gateway:
+    build:
+      context: ./src/gateway/Zta.Gateway
+    container_name: zta-gateway
+    depends_on:
+      - mssql
+      - ai-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__PolicyDb: Server=mssql,1433;Database=ZtaPolicy;User Id=sa;Password=${SA_PASSWORD:-Your_strong_password_123};TrustServerCertificate=true
+      ConnectionStrings__DecisionCacheDb: Data Source=/app/data/zta-cache.db
+      AiService__BaseUrl: http://ai-service:8000
+      Cors__AllowedOrigins__0: http://localhost:5173
+    ports:
+      - "5000:8080"
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  mssql_data:
