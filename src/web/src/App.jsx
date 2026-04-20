@@ -8,12 +8,13 @@ function formatTs(value) {
 export default function App() {
   const [events, setEvents] = useState([]);
   const [sourceIp, setSourceIp] = useState("203.0.113.10");
-  const [status, setStatus] = useState("System online");
+  const [status, setStatus] = useState("Gateway online");
 
   async function refresh() {
     try {
       const data = await getEvents();
       setEvents(data);
+      setStatus((current) => (current === "Gateway unreachable" ? "Gateway online" : current));
     } catch {
       setStatus("Gateway unreachable");
     }
