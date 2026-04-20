@@ -15,6 +15,7 @@ public sealed record EvaluateRequest(
 public sealed record DecisionResponse(
     bool Allowed,
     string Reason,
+    List<string> ReasonDetails,
     double RiskScore,
     bool IsAnomaly,
     string Source);
@@ -31,4 +32,5 @@ public sealed record SecurityEventDto(
     bool Allowed,
     double RiskScore,
     string Message,
+    long CreatedAtUnixMs,
     DateTimeOffset CreatedAt);

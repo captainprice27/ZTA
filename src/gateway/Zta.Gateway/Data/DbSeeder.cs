@@ -8,10 +8,6 @@ public static class DbSeeder
     public static async Task SeedAsync(IServiceProvider services)
     {
         var policyDb = services.GetRequiredService<PolicyDbContext>();
-        var cacheDb = services.GetRequiredService<CacheDbContext>();
-
-        await policyDb.Database.EnsureCreatedAsync();
-        await cacheDb.Database.EnsureCreatedAsync();
 
         if (!await policyDb.AccessPolicies.AnyAsync())
         {

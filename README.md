@@ -1,179 +1,294 @@
 # ZTA: Zero-Trust Access PoC
 
-This repository is a working Zero-Trust proof of concept built around one simple idea:
+This repository is a working zero-trust proof of concept built around one rule:
 
-> a request is not trusted just because the user is authenticated.
+> a request is not trusted just because the caller is authenticated.
 
-Every request is checked in three layers:
-- policy: is this user allowed to call this route?
-- anomaly: does the request look suspicious at the traffic level?
-- behavior: if behavior data is present, does it look like the expected user?
+Each request is evaluated through:
+- policy: is the caller allowed to access this route and method?
+- network risk: does the traffic pattern look anomalous?
+- behavior risk: if keystroke-style features are present, does it look like the expected user?
 
-The current system runs locally with:
-- `React` dashboard
-- `.NET` gateway
-- `FastAPI` AI scoring service
-- `SQLite` local policy/cache store
-- optional `SQL Server` / Azure-oriented path for later deployment
+The current codebase is a local-first PoC with optional Docker, SQL Server, and Azure-oriented paths.
 
-## Intuition
+## What This Project Does
 
-Think of the gateway as a smart security checkpoint:
+Think of the gateway as a security checkpoint:
 - policy is the access badge
-- network model is the metal detector
-- behavior model is the guard recognizing whether the person is walking and acting normally
+- the network model is the metal detector
+- the behavior model is the guard checking whether the person acts like the expected identity
 
-The request is only allowed if:
-1. policy allows it
-2. the combined risk score stays below the anomaly threshold
+The request is allowed only when:
+1. the access policy matches
+2. the final risk score stays below the anomaly threshold
 
-## What Happens On Each Request
+If the request is blocked:
+- the event is stored
+- the decision is cached
+- the source IP can be added to a blocked list
+- Azure NSG blocking can be triggered when enabled and configured
+
+## Current Runtime View
 
 ```mermaid
 flowchart LR
-    U[Client / Frontend / API caller] --> G[Gateway API]
-    G --> P[Policy Lookup]
-    G --> C[Decision Cache]
-    G --> A[AI Service]
-    A --> N[Network Model]
-    A --> B[Behavior Model]
-    A --> G
-    G --> E[Security Event Log]
+    U[Client or Dashboard] --> G[.NET Gateway :5000]
+    G --> P[(Policy Store)]
+    G --> C[(Cache and Event Store)]
+    G --> A[FastAPI AI Service :8000]
+    A --> N[Isolation Forest Network Model]
+    A --> B[Behavior Model per Subject]
+    G --> X[Optional Azure NSG Block]
     G --> R{Allow?}
     R -->|Yes| OK[200 OK]
-    R -->|No| NO[403 Forbidden]
+    R -->|No| DENY[403 Forbidden]
 ```
+
+## Request Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant Cache
+    participant Policy
+    participant AI
+    participant Azure
+
+    Client->>Gateway: POST /api/evaluate
+    Gateway->>Gateway: validate payload + resolve effective user
+    Gateway->>Cache: check blocked IP + cached decision
+    Gateway->>Policy: match user/path/method policy
+    Gateway->>AI: POST /score
+    AI-->>Gateway: anomaly_score + is_anomaly + reasons
+    Gateway->>Cache: persist event + decision
+    Gateway->>Azure: optional NSG block on anomaly
+    Gateway-->>Client: 200 OK or 403 Forbidden
+```
+
+## Technologies Used
+
+### Frontend
+- `React`
+- `Vite`
+- `JavaScript`
+- browser `fetch` API
+- CSS
+
+### Backend
+- `C#`
+- `.NET 10` minimal APIs
+- `Entity Framework Core`
+- `HttpClient`
+- `System.IdentityModel.Tokens.Jwt`
+
+### AI Service
+- `Python`
+- `FastAPI`
+- `Pydantic`
+- `NumPy`
+- `Pandas`
+- `scikit-learn`
+- `joblib`
+- `Uvicorn`
+
+### Databases and Storage
+- `SQLite` for local cache and event storage
+- `SQLite` or `SQL Server` for policy store, depending on config
+- `SQL Server Developer Edition` supported for local policy DB
+
+### Cloud and Infra
+- `Azure Identity`
+- `Azure Resource Manager`
+- `Azure Network Security Group` rule updates when enabled
+- `Docker`
+- `Docker Compose`
+- starter `Kubernetes` manifests
+- `Bicep` starter templates under `infra/azure`
+
+### Testing and Ops
+- PowerShell smoke tests
+- xUnit test project scaffold for gateway integration tests
 
 ## Repo Layout
 
 ```text
 ZTA/
   src/
-    gateway/Zta.Gateway/   # C# gateway, policy evaluation, cache, events
-    ai-service/            # Python AI scoring service + trained model artifacts
+    gateway/Zta.Gateway/   # C# gateway, policy evaluation, caching, kill-switch
+    ai-service/            # Python scoring service + trained model artifacts
     web/                   # React dashboard
-  infra/azure/             # starter Bicep templates
-  LOCAL_API_AND_RUNBOOK.md # local URLs + commands
-  THEORY.md                # problem framing / research-style explanation
-  ARCH.md                  # current implemented architecture
+  database/migrations/     # SQL migration scripts checked in
+  k8s/                     # starter Kubernetes manifests
+  infra/azure/             # starter Azure Bicep templates
+  tests/                   # smoke tests + gateway test project
+  LOCAL_API_AND_RUNBOOK.md
+  DEPLOYMENT.md
+  THEORY.md
+  ARCH.md
+  PREREQUISITES.md
 ```
 
-## Current Architecture
+## Current Local Modes
 
-```mermaid
-flowchart TD
-    W[React Dashboard :5173] --> GW[Gateway :5000]
-    GW --> SQLITE1[(Policy DB)]
-    GW --> SQLITE2[(Cache / Events DB)]
-    GW --> AI[AI Service :8000]
-    AI --> NM[Isolation Forest network model]
-    AI --> BM[Behavior models per subject]
-```
+### Mode 1: Local-first recommended
 
-## Components
+Use this for day-to-day development:
+- AI service on `localhost:8000`
+- gateway on `localhost:5000`
+- frontend on `localhost:5173`
+- SQLite policy/cache by default
 
-### 1. Gateway
+### Mode 2: SQL Server local mode
 
-The gateway is the main control plane.
+Use this when you want the policy store on your local SQL Server Developer Edition:
+- set `PolicyStore.Provider` to `SqlServer`
+- point `ConnectionStrings:PolicyDbSqlServer` to your local instance
 
-It does:
-- route/method policy matching
-- blocked-IP checks
-- short-lived decision caching
-- event logging
-- manual kill-switch handling
-- forwarding request telemetry to the AI service
+### Mode 3: Docker Compose
 
-Current local mode:
-- policy store: SQLite
-- cache/events: SQLite
-
-### 2. AI Service
-
-The AI service loads real trained artifacts from `src/ai-service/models/`:
-- network: `network_iforest.joblib`
-- behavior: `behavior_*.joblib`
-
-It computes:
-- network anomaly score
-- route/method/off-hours contextual risk
-- optional behavioral anomaly score
-
-Then it returns:
-- `anomaly_score`
-- `is_anomaly`
-- explanation reasons
-
-### 3. Frontend
-
-The dashboard is an operator view, not an end-user app.
-
-It currently provides:
-- live risk meter
-- traffic stream
-- manual kill-switch button
-
-## Local Run Modes
-
-### Recommended now: local-first mode
-
-This is the easiest current path and does not require Docker.
-
-1. Start AI service
-2. Start gateway
-3. Start frontend
-
-### Optional later: Docker mode
-
-Docker is useful when you want:
-- repeatable setup
+Use this when you want:
+- repeatable startup
 - SQL Server container
-- single-command startup
-- an easier path toward Kubernetes
+- a near-deployment style environment
 
-Kubernetes is not required for local use. It is only a future deployment/orchestration step.
+## How To Run
 
-## Quick Start
-
-### Install dependencies locally
+### 1. Install local dependencies
 
 ```powershell
 .\install-all.ps1
 ```
 
-### Start AI service
+### 2. Start AI service
 
 ```powershell
-cd src\ai-service
-& "..\..\..\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+cd e:\SAVED_CODES_AND_PROJECT\code-playing\ZTA\src\ai-service
+& "e:\SAVED_CODES_AND_PROJECT\code-playing\ZTA\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Health:
-- `http://localhost:8000/health`
+Expected:
+- terminal shows `Application startup complete`
+- `http://localhost:8000/health` returns model status, degraded mode, and weights
 
-### Start gateway
+### 3. Start gateway
 
 ```powershell
-cd src\gateway\Zta.Gateway
+cd e:\SAVED_CODES_AND_PROJECT\code-playing\ZTA\src\gateway\Zta.Gateway
 dotnet run
 ```
 
-Health:
-- `http://localhost:5000/health`
+Expected:
+- gateway starts on `http://localhost:5000`
+- startup bootstraps databases and seeds default policies if needed
+- `http://localhost:5000/health` returns provider info and Azure block status
 
-### Start frontend
+### 4. Start frontend
 
 ```powershell
-cd src\web
+cd e:\SAVED_CODES_AND_PROJECT\code-playing\ZTA\src\web
 npm run dev
 ```
 
-Dashboard:
-- `http://localhost:5173`
+Expected:
+- Vite serves on `http://localhost:5173`
+- dashboard loads the policy/event data through the gateway
+
+## What To Expect When Running
+
+### Healthy AI service
+
+`GET http://localhost:8000/health`
+
+Expected shape:
+
+```json
+{
+  "status": "ok",
+  "network_model_loaded": true,
+  "behavior_models_loaded": 51,
+  "user_subject_map_loaded": true,
+  "degraded_mode": false
+}
+```
+
+### Healthy gateway
+
+`GET http://localhost:5000/health`
+
+Expected shape:
+
+```json
+{
+  "status": "ok",
+  "utc": "2026-04-21T00:00:00+00:00",
+  "policyStore": "Sqlite",
+  "aiServiceBaseUrl": "http://localhost:8000",
+  "azureBlockEnabled": false
+}
+```
+
+### Policy list
+
+`GET http://localhost:5000/api/policies`
+
+Expected:
+- seeded demo policies for `prayas`
+
+### Evaluate a normal request
+
+`POST http://localhost:5000/api/evaluate`
+
+Expected:
+- `200 OK`
+- `allowed: true`
+- `reason: allowed-by-policy`
+- structured `reasonDetails`
+
+### Evaluate an attack-like request
+
+Expected:
+- `403 Forbidden`
+- `reason: anomaly-detected`
+- AI reasons such as frequency spike or payload burst
+- event stored in `/api/events`
+
+### Manual kill-switch
+
+`POST http://localhost:5000/api/kill-switch`
+
+Expected:
+- IP added to blocked list
+- follow-up requests from that IP get blocked
+- event visible in `/api/events`
+
+## Smoke Tests
+
+### AI smoke test
+
+```powershell
+cd e:\SAVED_CODES_AND_PROJECT\code-playing\ZTA\src\ai-service
+python .\smoke_test.py
+```
+
+### Gateway smoke test
+
+```powershell
+cd e:\SAVED_CODES_AND_PROJECT\code-playing\ZTA
+.\tests\gateway-smoke.ps1
+```
+
+What the gateway smoke test checks:
+- gateway health
+- allow path
+- anomaly block path
+- manual kill-switch
+- event emission
 
 ## Key Endpoints
 
 ### Gateway
+- `GET /`
 - `GET /health`
 - `GET /api/policies`
 - `GET /api/events`
@@ -182,55 +297,35 @@ Dashboard:
 
 ### AI service
 - `GET /health`
+- `GET /config`
 - `POST /score`
+- `POST /debug/behavior-score`
+- `POST /reload-models`
 
-See full URL list and commands in [LOCAL_API_AND_RUNBOOK.md](e:/SAVED_CODES_AND_PROJECT/code-playing/ZTA/LOCAL_API_AND_RUNBOOK.md).
-
-## Example Request Flow
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Gateway
-    participant AI
-    participant PolicyDB
-    participant Cache
-
-    Client->>Gateway: POST /api/evaluate
-    Gateway->>Cache: check cached decision / blocked IP
-    Gateway->>PolicyDB: resolve policy
-    Gateway->>AI: POST /score
-    AI-->>Gateway: anomaly_score + reasons
-    Gateway->>Cache: store event and decision
-    Gateway-->>Client: 200 or 403
-```
+See full local URLs and commands in [LOCAL_API_AND_RUNBOOK.md](e:/SAVED_CODES_AND_PROJECT/code-playing/ZTA/LOCAL_API_AND_RUNBOOK.md).
 
 ## Current Strengths
 
-- working end-to-end local PoC
-- real model artifacts are integrated, not placeholders
-- behavior path is wired through gateway to AI
-- manual kill-switch works
-- documentation now includes theory, architecture, and runbook files
+- working local end-to-end PoC
+- real trained network and behavior models are loaded
+- gateway now validates input and resolves effective user identity
+- structured decision reason details are returned and cached
+- event ordering now uses sortable Unix timestamps
+- Azure NSG block path is implemented behind config
+- smoke-test tooling exists for gateway and AI service
 
-## Current Limitations
+## Current Constraints
 
-- Azure NSG blocker is still a stub
-- network feature mapping is approximate relative to the training dataset
-- `/api/events` sorts in-memory because of SQLite `DateTimeOffset` limitations
-- behavior scoring depends on `behaviorFeatures` being available in the request
-
-## Suggested Improvements
-
-Highest-value next steps:
-- implement a real Azure NSG update path in the blocker service
-- add integration tests for normal vs attack vs behavior-mismatch flows
-- improve the runtime network feature mapping so it better matches training features
-- add structured logs / metrics for decision auditability
-- expose service health more explicitly in the UI
+- formal `dotnet test` execution was not runnable in the sandbox because NuGet access was blocked
+- EF migration classes were not generated in this environment because `dotnet-ef` was unavailable, so SQL migration scripts were checked in instead
+- runtime network feature mapping is still an approximation of the training feature space
+- JWT parsing is present, but full token validation middleware is not yet wired
 
 ## Related Docs
 
 - [LOCAL_API_AND_RUNBOOK.md](e:/SAVED_CODES_AND_PROJECT/code-playing/ZTA/LOCAL_API_AND_RUNBOOK.md)
+- [DEPLOYMENT.md](e:/SAVED_CODES_AND_PROJECT/code-playing/ZTA/DEPLOYMENT.md)
+- [PREREQUISITES.md](e:/SAVED_CODES_AND_PROJECT/code-playing/ZTA/PREREQUISITES.md)
 - [THEORY.md](e:/SAVED_CODES_AND_PROJECT/code-playing/ZTA/THEORY.md)
 - [ARCH.md](e:/SAVED_CODES_AND_PROJECT/code-playing/ZTA/ARCH.md)
+- [MODEL_CALIBRATION.md](e:/SAVED_CODES_AND_PROJECT/code-playing/ZTA/src/ai-service/MODEL_CALIBRATION.md)

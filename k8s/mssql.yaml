@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zta-mssql
+  namespace: zta
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zta-mssql
+  template:
+    metadata:
+      labels:
+        app: zta-mssql
+    spec:
+      containers:
+        - name: mssql
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: zta-secrets
+                  key: SA_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zta-mssql
+  namespace: zta
+spec:
+  selector:
+    app: zta-mssql
+  ports:
+    - port: 1433
+      targetPort: 1433

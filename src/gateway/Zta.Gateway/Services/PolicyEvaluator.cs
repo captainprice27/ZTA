@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Zta.Gateway.Data;
 using Zta.Gateway.Models;
 
@@ -28,7 +29,13 @@ public sealed class PolicyEvaluator(
 
         if (blocked is not null)
         {
-            return new DecisionResponse(false, $"IP currently blocked: {blocked.Reason}", 1.0, true, "blocked-list");
+            return new DecisionResponse(
+                false,
+                DecisionReasons.IpAlreadyBlocked,
+                [blocked.Reason],
+                1.0,
+                true,
+                "blocked-list");
         }
 
         var cacheKey = BuildCacheKey(request, now);
@@ -39,7 +46,13 @@ public sealed class PolicyEvaluator(
 
         if (cached is not null)
         {
-            return new DecisionResponse(cached.Allowed, cached.Reason, cached.RiskScore, cached.IsAnomaly, "sqlite-cache");
+            return new DecisionResponse(
+                cached.Allowed,
+                cached.Reason,
+                DeserializeReasonDetails(cached.ReasonDetailsJson),
+                cached.RiskScore,
+                cached.IsAnomaly,
+                "sqlite-cache");
         }
 
         var method = request.Method.ToUpperInvariant();
@@ -67,10 +80,11 @@ public sealed class PolicyEvaluator(
         var allow = hasPolicy && !aiScore.IsAnomaly;
 
         var reason = allow
-            ? "allowed-by-policy"
+            ? DecisionReasons.AllowedByPolicy
             : !hasPolicy
-                ? "policy-miss"
-                : "anomaly-detected";
+                ? DecisionReasons.PolicyMiss
+                : DecisionReasons.AnomalyDetected;
+        var reasonDetails = BuildReasonDetails(hasPolicy, aiScore.Reasons);
 
         if (!allow && aiScore.IsAnomaly && !string.IsNullOrWhiteSpace(request.SourceIp))
         {
@@ -91,6 +105,7 @@ public sealed class PolicyEvaluator(
             Allowed = allow,
             RiskScore = aiScore.AnomalyScore,
             Reason = reason,
+            ReasonDetailsJson = JsonSerializer.Serialize(reasonDetails),
             IsAnomaly = aiScore.IsAnomaly,
             CreatedAt = now,
             ExpiresAt = now.AddSeconds(45)
@@ -103,19 +118,22 @@ public sealed class PolicyEvaluator(
             Path = request.Path,
             Allowed = allow,
             RiskScore = aiScore.AnomalyScore,
-            Message = $"{reason}; ai={string.Join(",", aiScore.Reasons)}",
-            CreatedAt = now
+            Message = $"{reason}; ai={string.Join(",", reasonDetails)}",
+            CreatedAt = now,
+            CreatedAtUnixMs = now.ToUnixTimeMilliseconds()
         });
 
         await cacheDb.SaveChangesAsync(ct);
 
-        logger.LogInformation("Decision for user {UserId} path {Path}: {Decision} (score {Score})",
+        logger.LogInformation("Decision for user {UserId} path {Path}: {Decision} (score {Score}) reason={Reason} details={ReasonDetails}",
             request.UserId,
             request.Path,
             allow,
-            aiScore.AnomalyScore);
+            aiScore.AnomalyScore,
+            reason,
+            string.Join(',', reasonDetails));
 
-        return new DecisionResponse(allow, reason, aiScore.AnomalyScore, aiScore.IsAnomaly, "fresh-eval");
+        return new DecisionResponse(allow, reason, reasonDetails, aiScore.AnomalyScore, aiScore.IsAnomaly, "fresh-eval");
     }
 
     private static string BuildCacheKey(EvaluateRequest request, DateTimeOffset now)
@@ -153,5 +171,32 @@ public sealed class PolicyEvaluator(
 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()));
         return Convert.ToHexString(bytes[..8]);
+    }
+
+    private static List<string> BuildReasonDetails(bool hasPolicy, List<string> aiReasons)
+    {
+        var details = new List<string>();
+        details.Add(hasPolicy ? "policy-match" : "policy-not-found");
+        details.AddRange(aiReasons.Where(static r => !string.IsNullOrWhiteSpace(r)));
+        return details
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static List<string> DeserializeReasonDetails(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
     }
 }

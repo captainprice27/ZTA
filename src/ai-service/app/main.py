@@ -20,6 +20,7 @@ USER_SUBJECT_MAP_PATH = BEHAVIOR_DIR / "user_subject_map.json"
 NETWORK_WEIGHT = float(os.getenv("NETWORK_WEIGHT", "0.7"))
 BEHAVIOR_WEIGHT = float(os.getenv("BEHAVIOR_WEIGHT", "0.3"))
 ANOMALY_THRESHOLD = float(os.getenv("ANOMALY_THRESHOLD", "0.6"))
+ALLOW_DEGRADED_SCORING = os.getenv("ALLOW_DEGRADED_SCORING", "true").lower() == "true"
 
 
 class ScoreRequest(BaseModel):
@@ -47,6 +48,7 @@ class ScoreRequest(BaseModel):
     )
     request_latency_ms: float = Field(
         default=0,
+        ge=0,
         validation_alias=AliasChoices("request_latency_ms", "requestLatencyMs", "RequestLatencyMs"),
     )
     behavior_subject: str | None = Field(
@@ -63,6 +65,8 @@ class ScoreResponse(BaseModel):
     anomaly_score: float
     is_anomaly: bool
     reasons: list[str]
+    degraded_mode: bool = False
+    model_status: dict[str, Any] = Field(default_factory=dict)
 
 
 class ModelState:
@@ -71,21 +75,32 @@ class ModelState:
         self.network_meta: dict[str, Any] = {}
         self.behavior_models: dict[str, dict[str, Any]] = {}
         self.user_subject_map: dict[str, str] = {}
+        self.load_errors: list[str] = []
 
     def load(self) -> None:
+        self.load_errors = []
+        self.network_model = None
+        self.network_meta = {}
+        self.behavior_models = {}
+        self.user_subject_map = {}
+
         if NETWORK_MODEL_PATH.exists() and NETWORK_META_PATH.exists():
             try:
                 self.network_model = joblib.load(NETWORK_MODEL_PATH)
                 with open(NETWORK_META_PATH, "r", encoding="utf-8") as f:
                     self.network_meta = json.load(f)
             except Exception as ex:
-                print(f"[WARN] Failed to load network model: {ex}")
+                self.load_errors.append(f"network-model-load-failed:{type(ex).__name__}")
                 self.network_model = None
                 self.network_meta = {}
+        else:
+            self.load_errors.append("network-model-files-missing")
 
         if USER_SUBJECT_MAP_PATH.exists():
             with open(USER_SUBJECT_MAP_PATH, "r", encoding="utf-8") as f:
                 self.user_subject_map = json.load(f)
+        else:
+            self.load_errors.append("behavior-user-map-missing")
 
         if BEHAVIOR_DIR.exists():
             for p in BEHAVIOR_DIR.glob("behavior_*.joblib"):
@@ -95,13 +110,35 @@ class ModelState:
                     if subject:
                         self.behavior_models[subject] = bundle
                 except Exception as ex:
-                    print(f"[WARN] Failed to load behavior model {p.name}: {ex}")
+                    self.load_errors.append(f"behavior-model-load-failed:{p.name}:{type(ex).__name__}")
                     continue
+        else:
+            self.load_errors.append("behavior-directory-missing")
+
+    @property
+    def degraded(self) -> bool:
+        if not ALLOW_DEGRADED_SCORING:
+            return bool(self.load_errors)
+        return self.network_model is None
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "network_model_loaded": self.network_model is not None,
+            "behavior_models_loaded": len(self.behavior_models),
+            "user_subject_map_loaded": bool(self.user_subject_map),
+            "degraded_mode": self.degraded,
+            "load_errors": self.load_errors,
+            "weights": {
+                "network_weight": NETWORK_WEIGHT,
+                "behavior_weight": BEHAVIOR_WEIGHT,
+                "anomaly_threshold": ANOMALY_THRESHOLD,
+            },
+        }
 
 
 state = ModelState()
 state.load()
-app = FastAPI(title="ZTA AI Service", version="0.2.0")
+app = FastAPI(title="ZTA AI Service", version="0.3.0")
 
 
 def _safe_float(v: Any) -> float:
@@ -111,30 +148,91 @@ def _safe_float(v: Any) -> float:
         return 0.0
 
 
+def _ip_entropy(source_ip: str) -> float:
+    octets = [segment for segment in source_ip.split(".") if segment.isdigit()]
+    if len(octets) != 4:
+        return 0.0
+    nums = [int(part) for part in octets]
+    return float(np.std(nums))
+
+
+def _path_depth(path: str) -> int:
+    return max(0, len([part for part in path.split("/") if part]))
+
+
 def _path_risk(path: str, method: str, hour_of_day: int) -> tuple[float, list[str]]:
     score = 0.0
     reasons: list[str] = []
     low_path = path.lower()
-    m = method.upper()
+    method_upper = method.upper()
 
     if low_path.startswith("/api/admin"):
         score += 0.15
         reasons.append("admin-path-access")
-    if m in {"PUT", "DELETE", "PATCH"}:
+    if method_upper in {"PUT", "DELETE", "PATCH"}:
         score += 0.1
         reasons.append("state-changing-method")
     if hour_of_day < 6:
         score += 0.05
         reasons.append("off-hours-request")
+    if "auth" in low_path and method_upper == "POST":
+        score += 0.05
+        reasons.append("auth-surface")
 
     return min(score, 0.4), reasons
 
 
+def _feature_candidates(req: ScoreRequest) -> dict[str, float]:
+    requests = max(req.requests_per_minute, 1)
+    payload = max(req.payload_bytes, 0)
+    latency_ms = max(req.request_latency_ms, 0.0)
+    path_depth = _path_depth(req.path)
+    path_length = len(req.path)
+    ip_entropy = _ip_entropy(req.source_ip)
+    bytes_per_request = payload / requests
+    burst_factor = requests * max(bytes_per_request, 1.0)
+
+    return {
+        "flow byts/s": float(payload),
+        "flow pkts/s": float(requests),
+        "totlen fwd pkts": float(payload),
+        "tot fwd pkts": float(requests),
+        "flow duration": float(latency_ms * 1000.0),
+        "pkt len mean": float(bytes_per_request),
+        "pkt len max": float(min(payload, 65535)),
+        "pkt len min": float(0 if payload == 0 else min(bytes_per_request, 1500)),
+        "init fwd win byts": float(min(payload, 65535)),
+        "subflow fwd byts": float(payload),
+        "subflow fwd pkts": float(requests),
+        "flow iat mean": float(latency_ms),
+        "fwd iat mean": float(latency_ms),
+        "active mean": float(latency_ms),
+        "idle mean": float(max(0.0, (60000.0 / requests) - latency_ms)),
+        "down/up ratio": float(payload / max(requests, 1)),
+        "avg pkt size": float(bytes_per_request),
+        "fwd header len": float(path_length * 4),
+        "bwd header len": float(path_depth * 8),
+        "protocol": float({"GET": 6, "POST": 17, "PUT": 17, "DELETE": 17, "PATCH": 17}.get(req.method.upper(), 0)),
+        "min seg size fwd": float(max(20, min(path_length * 4, 1500))),
+        "packet length mean": float(bytes_per_request),
+        "act_data_pkt_fwd": float(path_depth),
+        "flow packets/s": float(requests),
+        "path depth surrogate": float(path_depth),
+        "request burst surrogate": float(burst_factor),
+        "source ip entropy": float(ip_entropy),
+    }
+
+
 def _network_score(req: ScoreRequest) -> tuple[float, list[str]]:
     reasons: list[str] = []
+    status = state.status()
 
     if state.network_model is None or not state.network_meta:
-        return 0.5, ["network-model-missing"]
+        reasons.extend(["network-model-missing"])
+        reasons.extend(status["load_errors"])
+        if not ALLOW_DEGRADED_SCORING:
+            return 1.0, reasons
+        return 0.5, reasons
 
     feature_cols = state.network_meta.get("feature_columns", [])
     medians = state.network_meta.get("feature_medians", {})
@@ -143,19 +241,14 @@ def _network_score(req: ScoreRequest) -> tuple[float, list[str]]:
 
     vector = [_safe_float(medians.get(c, 0.0)) for c in feature_cols]
     idx = {name.lower(): i for i, name in enumerate(feature_cols)}
+    candidates = _feature_candidates(req)
 
-    # Best-effort mapping from runtime request signals into IDS-trained feature space.
-    for col_name, val in (
-        ("flow byts/s", req.payload_bytes),
-        ("flow pkts/s", req.requests_per_minute),
-        ("totlen fwd pkts", req.payload_bytes),
-        ("tot fwd pkts", req.requests_per_minute),
-        ("flow duration", req.request_latency_ms * 1000.0),
-        ("pkt len mean", req.payload_bytes / max(req.requests_per_minute, 1)),
-    ):
-        i = idx.get(col_name)
-        if i is not None:
-            vector[i] = float(val)
+    mapped = 0
+    for column_name, value in candidates.items():
+        feature_index = idx.get(column_name)
+        if feature_index is not None:
+            vector[feature_index] = float(value)
+            mapped += 1
 
     x = pd.DataFrame([vector], columns=feature_cols, dtype=np.float64)
     score_samples = float(state.network_model.score_samples(x)[0])
@@ -167,6 +260,7 @@ def _network_score(req: ScoreRequest) -> tuple[float, list[str]]:
         reasons.append("payload-burst")
     if req.request_latency_ms > 2_000:
         reasons.append("latency-outlier")
+    reasons.append(f"network-features-mapped:{mapped}/{len(feature_cols)}")
     if not reasons:
         reasons.append("network-model-evaluated")
 
@@ -219,11 +313,20 @@ def _behavior_score(req: ScoreRequest) -> tuple[float | None, list[str]]:
 
 
 @app.get("/health")
-def health() -> dict:
+def health() -> dict[str, Any]:
     return {
         "status": "ok",
-        "network_model_loaded": state.network_model is not None,
-        "behavior_models_loaded": len(state.behavior_models),
+        **state.status(),
+    }
+
+
+@app.get("/config")
+def config() -> dict[str, Any]:
+    return {
+        "network_weight": NETWORK_WEIGHT,
+        "behavior_weight": BEHAVIOR_WEIGHT,
+        "anomaly_threshold": ANOMALY_THRESHOLD,
+        "allow_degraded_scoring": ALLOW_DEGRADED_SCORING,
     }
 
 
@@ -240,9 +343,35 @@ def score(req: ScoreRequest) -> ScoreResponse:
 
     is_anomaly = final_score >= ANOMALY_THRESHOLD
     reasons = network_reasons + path_reasons + behavior_reasons
+    if state.degraded:
+        reasons.append("service-degraded-mode")
 
     return ScoreResponse(
         anomaly_score=round(float(final_score), 6),
         is_anomaly=is_anomaly,
         reasons=reasons,
+        degraded_mode=state.degraded,
+        model_status=state.status(),
     )
+
+
+@app.post("/debug/behavior-score", response_model=ScoreResponse)
+def debug_behavior_score(req: ScoreRequest) -> ScoreResponse:
+    behavior_score, behavior_reasons = _behavior_score(req)
+    final_score = 0.0 if behavior_score is None else behavior_score
+    return ScoreResponse(
+        anomaly_score=round(float(final_score), 6),
+        is_anomaly=final_score >= 1.0,
+        reasons=behavior_reasons,
+        degraded_mode=state.degraded,
+        model_status=state.status(),
+    )
+
+
+@app.post("/reload-models")
+def reload_models() -> dict[str, Any]:
+    state.load()
+    return {
+        "status": "reloaded",
+        **state.status(),
+    }

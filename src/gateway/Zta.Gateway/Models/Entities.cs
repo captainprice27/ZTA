@@ -16,6 +16,7 @@ public sealed class CachedDecision
     public bool Allowed { get; set; }
     public double RiskScore { get; set; }
     public string Reason { get; set; } = string.Empty;
+    public string ReasonDetailsJson { get; set; } = "[]";
     public bool IsAnomaly { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
@@ -31,6 +32,7 @@ public sealed class SecurityEvent
     public double RiskScore { get; set; }
     public string Message { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
+    public long CreatedAtUnixMs { get; set; }
 }
 
 public sealed class BlockedIpEntry

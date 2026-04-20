@@ -17,7 +17,7 @@ public sealed class AiScoringClient(HttpClient httpClient, ILogger<AiScoringClie
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("AI service returned {StatusCode}", response.StatusCode);
-                return new AiScoreResponse(0.5, false, ["ai-unavailable"]);
+                return new AiScoreResponse(0.5, false, ["ai-unavailable", $"ai-http-{(int)response.StatusCode}"]);
             }
 
             var payload = await response.Content.ReadFromJsonAsync<AiScoreResponse>(cancellationToken: ct);

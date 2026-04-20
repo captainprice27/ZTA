@@ -15,6 +15,7 @@ public sealed class CacheDbContext(DbContextOptions<CacheDbContext> options) : D
         {
             entity.Property(p => p.CacheKey).HasMaxLength(260).IsRequired();
             entity.Property(p => p.Reason).HasMaxLength(300).IsRequired();
+            entity.Property(p => p.ReasonDetailsJson).HasMaxLength(1000).IsRequired();
             entity.HasIndex(p => p.CacheKey).IsUnique();
             entity.HasIndex(p => p.ExpiresAt);
         });
@@ -25,7 +26,7 @@ public sealed class CacheDbContext(DbContextOptions<CacheDbContext> options) : D
             entity.Property(p => p.SourceIp).HasMaxLength(64).IsRequired();
             entity.Property(p => p.Path).HasMaxLength(200).IsRequired();
             entity.Property(p => p.Message).HasMaxLength(400).IsRequired();
-            entity.HasIndex(p => p.CreatedAt);
+            entity.HasIndex(p => p.CreatedAtUnixMs);
         });
 
         modelBuilder.Entity<BlockedIpEntry>(entity =>
