@@ -1,141 +1,400 @@
-# THEORY: Zero Trust + Behavioral AI Gateway
+# Theory And Domain Context
 
-## 1. Problem Statement
+## What Domain This Project Targets
 
-Traditional perimeter security assumes that once a request is authenticated, it is mostly trusted inside the network boundary. This model fails under:
-- stolen sessions/tokens,
-- credential stuffing,
-- low-and-slow exfiltration,
-- internal lateral movement.
+This project targets the intersection of:
 
-The project addresses this by applying Zero Trust principles at request time:
-1. Policy trust: "Is this identity allowed on this route/method?"
-2. Behavioral trust: "Is this behavior statistically consistent with expected usage?"
+- cybersecurity
+- zero-trust access control
+- anomaly detection
+- behavioral biometrics
+- cloud/network enforcement
 
-Access is treated as continuously re-evaluated, not permanently granted.
+The core problem is not ordinary login or CRUD application development. The problem is:
 
-## 2. Research Motivation
+> after a user is authenticated, can the system still decide whether the request should be trusted right now?
 
-The system combines:
-- deterministic authorization (policy rules),
-- anomaly detection (network behavior),
-- biometric-style behavioral profiling (keystroke timing model),
-- operational response (kill-switch and future NSG-level blocking).
+That is the domain this project lives in.
 
-This hybrid is motivated by a practical observation: policy alone cannot detect abuse by valid credentials, while anomaly-only systems lack deterministic access boundaries.
+## Why This Domain Matters
 
-## 3. Core Hypothesis
+Traditional security models often assume:
 
-A request-level decision engine that fuses policy + anomaly signals can reduce false trust and improve early attack detection without blocking all unknown behavior.
+1. if a user has logged in, they are trusted
+2. if a request comes from inside the network, it is relatively safe
+3. if the role looks valid, the action can proceed
 
-Formally, for each request `r`:
-- policy decision `P(r)` in `{allow, deny}`,
-- network risk `N(r)` in `[0,1]`,
-- optional behavioral risk `B(r)` in `[0,1]`,
-- context risk `C(r)` in `[0,1]` (path/method/off-hours heuristics).
+These assumptions break in common attack scenarios:
 
-Current scoring design:
-- if behavioral input missing: `R = min(1, N + C)`
-- if behavioral input present: `R = min(1, wN*N + wB*B + C)`
+- stolen credentials
+- token/session hijacking
+- insider misuse
+- low-and-slow data exfiltration
+- API abuse by valid but compromised accounts
 
-Decision:
-- allow iff `P(r)=allow` and `R < threshold`.
+This is why zero trust exists.
 
-## 4. Data/Model Theory
+Zero trust changes the security question from:
 
-### 4.1 Network Anomaly Model
+> "Was the user authenticated once?"
 
-Dataset basis: CIC-IDS2018 subset (sampled in training workspace).  
-Model: Isolation Forest (unsupervised anomaly model).
+to:
 
-Why Isolation Forest:
-- robust baseline for outlier detection,
-- works without full attack label dependency,
-- computationally practical for PoC.
+> "Should this specific request be trusted now, in this context, with this behavior, for this route?"
 
-Model output is transformed into risk score via sigmoid-like mapping from model scores.
+## The Specific Problem We Are Solving
 
-### 4.2 Behavioral Model
+The project aims to build a request-time access decision engine that combines:
 
-Dataset basis: DSL-StrongPasswordData (keystroke timing).  
-Model strategy: per-subject reconstruction model (autoencoder-style via MLPRegressor).
+1. policy logic
+2. network anomaly detection
+3. optional behavioral identity evidence
+4. operational response such as blocking and event visibility
 
-Reasoning:
-- behavioral identity is user-specific,
-- reconstruction error naturally supports "normal pattern vs unusual pattern" thresholding.
+In practical terms, the system should help detect:
 
-Each subject gets:
-- scaler,
-- reconstruction model,
-- subject-specific threshold.
+- valid user accessing an invalid endpoint
+- unusual request bursts from a legitimate account
+- suspicious off-hours access
+- keystroke/interaction behavior inconsistent with the expected user
+- attack-like API traffic that policy alone cannot catch
 
-## 5. What Issues This Solves
+## Intuition
 
-1. Compromised valid credentials:
-- policy may allow route, but behavior/network anomaly raises risk.
+Think of a secure building.
 
-2. Burst abuse from valid account:
-- rate + payload + latency signals increase network risk.
+- authentication is the ID card
+- authorization policy is the rulebook at the gate
+- anomaly detection is the metal detector
+- behavior biometrics is the guard recognizing whether the person acts like the expected person
 
-3. Manual incident response:
-- kill-switch allows immediate block workflow from dashboard/API.
+A valid ID is not enough if:
 
-4. Continuous risk awareness:
-- event stream and risk score expose operational state.
+- the person is trying to enter the wrong room
+- they are carrying suspicious equipment
+- their behavior does not match the expected person
 
-## 6. Current Practical Constraints (Known)
+That is exactly what this project models for API traffic.
 
-1. Feature mismatch:
-- runtime gateway has fewer coarse features than original IDS training space.
-- mapping is best-effort, not full flow feature parity.
+## Core Security Principle
 
-2. Behavioral payload availability:
-- behavior scoring only meaningful when behavior features are provided.
+The project is built on a zero-trust principle:
 
-3. Cloud blocking not fully enforced yet:
-- Azure blocker currently logs intent (stub), not full NSG mutation in production path.
+> never trust implicitly; verify continuously and contextually
 
-4. Dataset sampling tradeoff:
-- sampled training improves laptop feasibility but may reduce tail-attack representation.
+This means a request is evaluated using multiple signals, not just one binary auth check.
 
-## 7. Security/Operational Risks
+## High-Level Decision Logic
 
-1. False positives:
-- anomaly systems can overreact during unusual but legitimate spikes.
+```mermaid
+flowchart TD
+    A[Incoming Request] --> B[Identity Known or Resolved]
+    B --> C[Policy Check]
+    C --> D{Policy Match?}
+    D -->|No| X[Block]
+    D -->|Yes| E[Network Risk Scoring]
+    E --> F[Context Risk]
+    E --> G[Behavior Risk if present]
+    F --> H[Combined Risk]
+    G --> H
+    H --> I{Risk below threshold?}
+    I -->|Yes| Y[Allow]
+    I -->|No| X
+```
 
-2. False negatives:
-- attacker behavior can mimic baseline under low-and-slow attack.
+## Why Policy Alone Is Not Enough
 
-3. Threshold sensitivity:
-- global threshold may not be optimal per route/user.
+Policy answers:
 
-Mitigation approach:
-- maintain auditable event logs,
-- separate policy deny vs anomaly deny reasons,
-- calibrate thresholds using replayed traffic.
+- who can access what
+- which route/method combinations are allowed
 
-## 8. Evaluation Lens
+Policy does not answer:
 
-For research-quality progression, evaluate:
-- policy accuracy (authorized/unauthorized),
-- anomaly separation (AUC, precision/recall on synthetic attack traffic),
-- operational metrics (decision latency, cache hit rate),
-- stability metrics (false block rate over benign sessions).
+- whether the traffic pattern is suspicious
+- whether the user behavior is abnormal
+- whether the access timing is unusual
+- whether a valid identity is being abused
 
-## 9. What We Are Solving Next
+So policy is necessary but insufficient.
 
-Near-term:
-1. Better behavioral input capture from client telemetry.
-2. Route-aware thresholding and weighting.
-3. Full Azure NSG action path with credentials and rollback strategy.
-4. Stronger test harness (normal vs attack scenarios scripted).
+## Why AI/ML Is Introduced
 
-Mid-term:
-1. Add supervised network model track and ensemble with IF.
-2. Per-user adaptive baselines and drift monitoring.
-3. Explainability payloads for SOC/operator tooling.
+The AI component exists to answer a different class of questions:
 
-## 10. Research Summary
+- does the traffic look like normal behavior?
+- does the request rate or size look unusual?
+- do the behavior signals look like the enrolled subject?
 
-This project is currently a functional Zero-Trust PoC with request-time policy enforcement, anomaly-aware scoring, and model-backed behavioral hooks.  
-It demonstrates an implementable bridge between access control and applied cyber anomaly detection, with clear upgrade paths toward production-grade controls.
+This is an anomaly detection problem, not a rule-only problem.
+
+## Network Anomaly Modeling
+
+The network side of this project is based on intrusion-detection style flow data.
+
+Model family used:
+
+- Isolation Forest
+
+Reason:
+
+- practical for anomaly detection
+- good baseline for outlier-style problems
+- does not require fully supervised labels for every runtime case
+
+Conceptually:
+
+1. learn what normal request/traffic patterns look like
+2. assign higher risk to unusual patterns
+
+Examples of suspicious signals:
+
+- sudden spike in requests per minute
+- unusually large payload size
+- abnormal latency characteristics
+- unusual access context such as admin or off-hours requests
+
+## Behavioral Biometrics
+
+Authentication can be stolen. Behavior is harder to imitate consistently.
+
+Behavioral biometrics in this project use timing-style features such as:
+
+- key hold times
+- transition delays between keys
+- typing rhythm
+
+The idea is:
+
+- the same credentials can be used by two different people
+- their fine-grained behavioral patterns often differ
+
+This makes behavioral modeling useful as a secondary trust signal.
+
+## Why This Combination Is Stronger
+
+The project combines:
+
+1. deterministic control
+2. statistical control
+3. operational visibility
+
+More precisely:
+
+- policy gives explicit authorization boundaries
+- anomaly detection catches unusual patterns within allowed boundaries
+- behavior scoring helps detect identity misuse
+- event logging and kill-switch support operator response
+
+This hybrid approach is more realistic than using any single layer alone.
+
+## Importance Of This Domain In Industry
+
+This domain matters in:
+
+- enterprise API security
+- SaaS platform protection
+- privileged access control
+- SOC and incident response workflows
+- insider threat detection
+- identity-centric cloud security
+
+Modern organizations increasingly expose:
+
+- APIs
+- cloud workloads
+- internal developer portals
+- remote admin surfaces
+
+That makes request-time trust evaluation a practical need, not a theoretical one.
+
+## CS Fundamentals Needed To Understand This Project
+
+### 1. Client-server systems
+
+You should understand:
+
+- HTTP requests and responses
+- service-to-service communication
+- ports and local URLs
+
+### 2. Authentication vs authorization
+
+- authentication = who are you
+- authorization = what are you allowed to do
+
+This project mainly extends authorization with dynamic risk scoring.
+
+### 3. API design
+
+You should be comfortable with:
+
+- `GET`, `POST`
+- JSON payloads
+- HTTP status codes like `200`, `400`, `403`
+
+### 4. Databases
+
+You need basic understanding of:
+
+- tables/entities
+- primary keys
+- indexes
+- querying
+- cache vs durable store
+
+### 5. Caching
+
+This project caches recent decisions to avoid unnecessary recomputation and repeated model calls.
+
+Important ideas:
+
+- cache hit
+- cache miss
+- TTL
+- consistency tradeoff
+
+### 6. Basic ML concepts
+
+You do not need deep ML math, but you do need:
+
+- feature vectors
+- scores
+- thresholds
+- false positives
+- false negatives
+- anomaly detection intuition
+
+### 7. Distributed systems basics
+
+Even locally, this is already a distributed system:
+
+- frontend
+- gateway
+- AI service
+- database layers
+
+So you should understand:
+
+- service boundaries
+- timeouts
+- health checks
+- partial failure
+
+### 8. Cloud/network security basics
+
+To understand the Azure/network side, you need:
+
+- IP addresses
+- NSG concepts
+- why network-level deny rules matter
+- why automation is useful after a threat decision
+
+## Why The Project Uses Multiple Components
+
+```mermaid
+flowchart LR
+    U[Client] --> W[Frontend]
+    W --> G[Gateway]
+    G --> P[(Policy Store)]
+    G --> C[(Cache and Events)]
+    G --> A[AI Service]
+    A --> N[Network Model]
+    A --> B[Behavior Models]
+    G --> Z[Optional Azure NSG Action]
+```
+
+Each part exists for a reason:
+
+- frontend: operator visibility and manual controls
+- gateway: decision orchestration and enforcement point
+- AI service: model execution and scoring isolation
+- DB layer: policies, cache, events, blocked IPs
+- Azure path: network-level response capability
+
+This separation improves:
+
+- clarity
+- maintainability
+- operational control
+- future deployability
+
+## What Makes This More Than A Demo Dashboard
+
+This project is not mainly about the UI.
+
+It is a security decision system with:
+
+- policy evaluation
+- model-backed scoring
+- service orchestration
+- storage and eventing
+- operator response hooks
+
+The dashboard exists because security systems require observability and operator action.
+
+## Typical Use Cases
+
+1. API gateway with dynamic trust scoring
+2. protected admin surface with anomaly-aware access control
+3. research/demo platform for zero trust plus ML fusion
+4. security engineering prototype for cloud-native access control
+
+## Main Tradeoffs In This Domain
+
+Every security decision system must balance:
+
+### 1. False positives
+
+Too aggressive:
+
+- more attacks caught
+- more legitimate traffic blocked
+
+### 2. False negatives
+
+Too lenient:
+
+- fewer disruptions
+- more malicious activity passes
+
+### 3. Latency vs depth
+
+More checks can improve trust quality but increase response latency.
+
+### 4. Simplicity vs realism
+
+Simple policy systems are easy to reason about but weak against misuse.
+Richer anomaly systems are stronger but harder to calibrate.
+
+## Why This Project Is Worth Building
+
+This project demonstrates a practical bridge between:
+
+- software engineering
+- security architecture
+- ML-based anomaly detection
+- operator response workflow
+
+That makes it a strong project for:
+
+- cybersecurity portfolios
+- systems design discussion
+- applied ML in security contexts
+- cloud and backend engineering showcases
+
+## Final Summary
+
+This project targets the zero-trust security domain, specifically request-time trust evaluation for APIs and service access.
+
+It matters because valid credentials are no longer enough to treat traffic as safe.
+
+The system therefore combines:
+
+- explicit policy rules
+- anomaly-aware risk scoring
+- optional behavior-based identity signals
+- event visibility
+- automated or manual blocking paths
+
+That combination is the real subject of the project.
