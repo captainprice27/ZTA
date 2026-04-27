@@ -3,11 +3,19 @@ namespace Zta.Gateway.Services;
 public sealed class AiServiceOptions
 {
     public string BaseUrl { get; set; } = "http://localhost:8000";
+    public bool FailClosedOnUnavailable { get; set; }
+    public int HealthProbeTimeoutMs { get; set; } = 1500;
 }
 
 public sealed class PolicyStoreOptions
 {
     public string Provider { get; set; } = "Sqlite";
+}
+
+public sealed class MaintenanceOptions
+{
+    public int CleanupIntervalSeconds { get; set; } = 300;
+    public int RetainedEventCount { get; set; } = 1000;
 }
 
 public sealed class AzureBlockOptions

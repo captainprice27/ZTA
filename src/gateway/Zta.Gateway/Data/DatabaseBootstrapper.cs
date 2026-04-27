@@ -44,6 +44,21 @@ public static class DatabaseBootstrapper
         {
             await TryExecuteSchemaPatchAsync(cacheDb, "ALTER TABLE SecurityEvents ADD COLUMN CreatedAtUnixMs INTEGER NOT NULL DEFAULT 0;", logger, ct);
             await TryExecuteSchemaPatchAsync(cacheDb, "ALTER TABLE CachedDecisions ADD COLUMN ReasonDetailsJson TEXT NOT NULL DEFAULT '[]';", logger, ct);
+            await TryExecuteSchemaPatchAsync(cacheDb, "ALTER TABLE SecurityEvents ADD COLUMN FeatureContributionsJson TEXT NOT NULL DEFAULT '{}';", logger, ct);
+            await TryExecuteSchemaPatchAsync(cacheDb,
+                """
+                CREATE TABLE IF NOT EXISTS AnalyticsSnapshots (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    HourBucket INTEGER NOT NULL,
+                    TotalEvents INTEGER NOT NULL DEFAULT 0,
+                    BlockedCount INTEGER NOT NULL DEFAULT 0,
+                    AllowedCount INTEGER NOT NULL DEFAULT 0,
+                    AvgRiskScore REAL NOT NULL DEFAULT 0,
+                    MaxRiskScore REAL NOT NULL DEFAULT 0,
+                    CreatedAt TEXT NOT NULL DEFAULT '0001-01-01T00:00:00+00:00'
+                );
+                """, logger, ct);
+            await TryExecuteSchemaPatchAsync(cacheDb, "CREATE UNIQUE INDEX IF NOT EXISTS IX_AnalyticsSnapshots_HourBucket ON AnalyticsSnapshots (HourBucket);", logger, ct);
         }
         else
         {

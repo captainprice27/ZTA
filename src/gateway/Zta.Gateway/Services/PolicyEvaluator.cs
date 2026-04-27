@@ -17,6 +17,7 @@ public sealed class PolicyEvaluator(
     CacheDbContext cacheDb,
     IAiScoringClient aiScoringClient,
     INetworkBlocker networkBlocker,
+    Microsoft.Extensions.Options.IOptions<AiServiceOptions> aiOptions,
     ILogger<PolicyEvaluator> logger) : IPolicyEvaluator
 {
     public async Task<DecisionResponse> EvaluateAsync(EvaluateRequest request, CancellationToken ct)
@@ -77,39 +78,27 @@ public sealed class PolicyEvaluator(
             request.BehaviorFeatures), ct);
 
         var hasPolicy = policy is not null;
-        var allow = hasPolicy && !aiScore.IsAnomaly;
+        var failClosedOnUnavailable = aiOptions.Value.FailClosedOnUnavailable;
+        var aiUnavailable = aiScore.Reasons.Any(r => r.StartsWith("ai-", StringComparison.OrdinalIgnoreCase));
+        var denyForAiUnavailable = failClosedOnUnavailable && aiUnavailable;
+        var allow = hasPolicy && !aiScore.IsAnomaly && !denyForAiUnavailable;
 
         var reason = allow
             ? DecisionReasons.AllowedByPolicy
+            : denyForAiUnavailable
+                ? DecisionReasons.AiUnavailable
             : !hasPolicy
                 ? DecisionReasons.PolicyMiss
                 : DecisionReasons.AnomalyDetected;
-        var reasonDetails = BuildReasonDetails(hasPolicy, aiScore.Reasons);
+        var reasonDetails = BuildReasonDetails(hasPolicy, aiScore.Reasons, aiScore.DegradedMode, denyForAiUnavailable);
 
         if (!allow && aiScore.IsAnomaly && !string.IsNullOrWhiteSpace(request.SourceIp))
         {
             await networkBlocker.BlockIpAsync(request.SourceIp, "Auto block due to anomaly", ct);
-
-            cacheDb.BlockedIpEntries.Add(new BlockedIpEntry
-            {
-                SourceIp = request.SourceIp,
-                Reason = "Auto block due to anomaly",
-                BlockedAt = now,
-                ExpiresAt = now.AddMinutes(15)
-            });
+            await UpsertBlockedEntryAsync(request.SourceIp, "Auto block due to anomaly", now, ct);
         }
 
-        cacheDb.CachedDecisions.Add(new CachedDecision
-        {
-            CacheKey = cacheKey,
-            Allowed = allow,
-            RiskScore = aiScore.AnomalyScore,
-            Reason = reason,
-            ReasonDetailsJson = JsonSerializer.Serialize(reasonDetails),
-            IsAnomaly = aiScore.IsAnomaly,
-            CreatedAt = now,
-            ExpiresAt = now.AddSeconds(45)
-        });
+        await UpsertCachedDecisionAsync(cacheKey, allow, aiScore, reason, reasonDetails, now, ct);
 
         cacheDb.SecurityEvents.Add(new SecurityEvent
         {
@@ -119,6 +108,9 @@ public sealed class PolicyEvaluator(
             Allowed = allow,
             RiskScore = aiScore.AnomalyScore,
             Message = $"{reason}; ai={string.Join(",", reasonDetails)}",
+            FeatureContributionsJson = aiScore.FeatureContributions is not null
+                ? JsonSerializer.Serialize(aiScore.FeatureContributions)
+                : "{}",
             CreatedAt = now,
             CreatedAtUnixMs = now.ToUnixTimeMilliseconds()
         });
@@ -173,11 +165,78 @@ public sealed class PolicyEvaluator(
         return Convert.ToHexString(bytes[..8]);
     }
 
-    private static List<string> BuildReasonDetails(bool hasPolicy, List<string> aiReasons)
+    private async Task UpsertBlockedEntryAsync(string sourceIp, string reason, DateTimeOffset now, CancellationToken ct)
+    {
+        var existing = await cacheDb.BlockedIpEntries
+            .FirstOrDefaultAsync(x => x.SourceIp == sourceIp && (x.ExpiresAt == null || x.ExpiresAt > now), ct);
+
+        if (existing is null)
+        {
+            cacheDb.BlockedIpEntries.Add(new BlockedIpEntry
+            {
+                SourceIp = sourceIp,
+                Reason = reason,
+                BlockedAt = now,
+                ExpiresAt = now.AddMinutes(15)
+            });
+            return;
+        }
+
+        existing.Reason = reason;
+        existing.BlockedAt = now;
+        existing.ExpiresAt = now.AddMinutes(15);
+    }
+
+    private async Task UpsertCachedDecisionAsync(
+        string cacheKey,
+        bool allow,
+        AiScoreResponse aiScore,
+        string reason,
+        List<string> reasonDetails,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var existing = await cacheDb.CachedDecisions
+            .FirstOrDefaultAsync(x => x.CacheKey == cacheKey, ct);
+
+        if (existing is null)
+        {
+            cacheDb.CachedDecisions.Add(new CachedDecision
+            {
+                CacheKey = cacheKey,
+                Allowed = allow,
+                RiskScore = aiScore.AnomalyScore,
+                Reason = reason,
+                ReasonDetailsJson = JsonSerializer.Serialize(reasonDetails),
+                IsAnomaly = aiScore.IsAnomaly,
+                CreatedAt = now,
+                ExpiresAt = now.AddSeconds(45)
+            });
+            return;
+        }
+
+        existing.Allowed = allow;
+        existing.RiskScore = aiScore.AnomalyScore;
+        existing.Reason = reason;
+        existing.ReasonDetailsJson = JsonSerializer.Serialize(reasonDetails);
+        existing.IsAnomaly = aiScore.IsAnomaly;
+        existing.CreatedAt = now;
+        existing.ExpiresAt = now.AddSeconds(45);
+    }
+
+    private static List<string> BuildReasonDetails(bool hasPolicy, List<string> aiReasons, bool aiDegraded, bool aiUnavailable)
     {
         var details = new List<string>();
         details.Add(hasPolicy ? "policy-match" : "policy-not-found");
         details.AddRange(aiReasons.Where(static r => !string.IsNullOrWhiteSpace(r)));
+        if (aiDegraded)
+        {
+            details.Add(DecisionReasons.AiDegraded);
+        }
+        if (aiUnavailable)
+        {
+            details.Add(DecisionReasons.AiUnavailable);
+        }
         return details
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();

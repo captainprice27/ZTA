@@ -8,6 +8,7 @@ public sealed class CacheDbContext(DbContextOptions<CacheDbContext> options) : D
     public DbSet<CachedDecision> CachedDecisions => Set<CachedDecision>();
     public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
     public DbSet<BlockedIpEntry> BlockedIpEntries => Set<BlockedIpEntry>();
+    public DbSet<AnalyticsSnapshot> AnalyticsSnapshots => Set<AnalyticsSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +27,7 @@ public sealed class CacheDbContext(DbContextOptions<CacheDbContext> options) : D
             entity.Property(p => p.SourceIp).HasMaxLength(64).IsRequired();
             entity.Property(p => p.Path).HasMaxLength(200).IsRequired();
             entity.Property(p => p.Message).HasMaxLength(400).IsRequired();
+            entity.Property(p => p.FeatureContributionsJson).HasMaxLength(2000).HasDefaultValue("{}");
             entity.HasIndex(p => p.CreatedAtUnixMs);
         });
 
@@ -35,5 +37,11 @@ public sealed class CacheDbContext(DbContextOptions<CacheDbContext> options) : D
             entity.Property(p => p.Reason).HasMaxLength(200).IsRequired();
             entity.HasIndex(p => p.SourceIp);
         });
+
+        modelBuilder.Entity<AnalyticsSnapshot>(entity =>
+        {
+            entity.HasIndex(p => p.HourBucket).IsUnique();
+        });
     }
 }
+

@@ -32,6 +32,14 @@ public static class RequestValidation
         {
             errors.Add("method is required");
         }
+        else
+        {
+            var method = request.Method.Trim().ToUpperInvariant();
+            if (method is not ("GET" or "POST" or "PUT" or "DELETE" or "PATCH" or "HEAD" or "OPTIONS"))
+            {
+                errors.Add("method must be a supported HTTP verb");
+            }
+        }
 
         if (request.RequestsPerMinute < 0)
         {
@@ -51,6 +59,11 @@ public static class RequestValidation
         if (request.RequestLatencyMs < 0)
         {
             errors.Add("requestLatencyMs cannot be negative");
+        }
+
+        if (request.Path?.Length > 200)
+        {
+            errors.Add("path is too long");
         }
 
         return errors;

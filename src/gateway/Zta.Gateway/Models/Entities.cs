@@ -31,6 +31,7 @@ public sealed class SecurityEvent
     public bool Allowed { get; set; }
     public double RiskScore { get; set; }
     public string Message { get; set; } = string.Empty;
+    public string FeatureContributionsJson { get; set; } = "{}";
     public DateTimeOffset CreatedAt { get; set; }
     public long CreatedAtUnixMs { get; set; }
 }
@@ -43,3 +44,16 @@ public sealed class BlockedIpEntry
     public DateTimeOffset BlockedAt { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }
 }
+
+public sealed class AnalyticsSnapshot
+{
+    public int Id { get; set; }
+    public long HourBucket { get; set; }
+    public int TotalEvents { get; set; }
+    public int BlockedCount { get; set; }
+    public int AllowedCount { get; set; }
+    public double AvgRiskScore { get; set; }
+    public double MaxRiskScore { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+

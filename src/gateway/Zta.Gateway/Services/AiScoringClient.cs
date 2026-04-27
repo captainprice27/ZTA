@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 
 namespace Zta.Gateway.Services;
 
@@ -17,16 +18,25 @@ public sealed class AiScoringClient(HttpClient httpClient, ILogger<AiScoringClie
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("AI service returned {StatusCode}", response.StatusCode);
-                return new AiScoreResponse(0.5, false, ["ai-unavailable", $"ai-http-{(int)response.StatusCode}"]);
+                return new AiScoreResponse(0.5, false, ["ai-unavailable", $"ai-http-{(int)response.StatusCode}"], true);
             }
 
             var payload = await response.Content.ReadFromJsonAsync<AiScoreResponse>(cancellationToken: ct);
-            return payload ?? new AiScoreResponse(0.5, false, ["ai-empty-response"]);
+            return payload ?? new AiScoreResponse(0.5, false, ["ai-empty-response"], false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning("AI scoring call timed out");
+            return new AiScoreResponse(0.5, false, ["ai-timeout"], true);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "AI scoring call failed");
-            return new AiScoreResponse(0.5, false, ["ai-call-failed"]);
+            return new AiScoreResponse(0.5, false, ["ai-call-failed"], true);
         }
     }
 }
@@ -44,6 +54,14 @@ public sealed record AiScoreRequest(
     Dictionary<string, double>? BehaviorFeatures = null);
 
 public sealed record AiScoreResponse(
+    [property: JsonPropertyName("anomaly_score")]
     double AnomalyScore,
+    [property: JsonPropertyName("is_anomaly")]
     bool IsAnomaly,
-    List<string> Reasons);
+    [property: JsonPropertyName("reasons")]
+    List<string> Reasons,
+    [property: JsonPropertyName("degraded_mode")]
+    bool DegradedMode = false,
+    [property: JsonPropertyName("feature_contributions")]
+    Dictionary<string, double>? FeatureContributions = null);
+

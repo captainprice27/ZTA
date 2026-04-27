@@ -11,4 +11,7 @@ public static class DecisionReasons
     public const string UserIdMismatch = "user-id-mismatch";
     public const string AuthenticatedUserApplied = "authenticated-user-applied";
     public const string HeaderUserApplied = "header-user-applied";
+    public const string AiUnavailable = "ai-unavailable";
+    public const string AiDegraded = "ai-degraded";
+    public const string InternalError = "internal-error";
 }

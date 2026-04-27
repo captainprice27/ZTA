@@ -1,5 +1,6 @@
 import json
 import os
+from threading import RLock
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +8,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
 APP_ROOT = Path(__file__).resolve().parents[1]
@@ -19,8 +20,24 @@ USER_SUBJECT_MAP_PATH = BEHAVIOR_DIR / "user_subject_map.json"
 
 NETWORK_WEIGHT = float(os.getenv("NETWORK_WEIGHT", "0.7"))
 BEHAVIOR_WEIGHT = float(os.getenv("BEHAVIOR_WEIGHT", "0.3"))
-ANOMALY_THRESHOLD = float(os.getenv("ANOMALY_THRESHOLD", "0.6"))
+_anomaly_threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.6"))
 ALLOW_DEGRADED_SCORING = os.getenv("ALLOW_DEGRADED_SCORING", "true").lower() == "true"
+
+if NETWORK_WEIGHT < 0 or BEHAVIOR_WEIGHT < 0:
+    raise ValueError("NETWORK_WEIGHT and BEHAVIOR_WEIGHT must be non-negative")
+if _anomaly_threshold < 0 or _anomaly_threshold > 1:
+    raise ValueError("ANOMALY_THRESHOLD must be between 0 and 1")
+
+
+def get_anomaly_threshold() -> float:
+    return _anomaly_threshold
+
+
+def set_anomaly_threshold(value: float) -> None:
+    global _anomaly_threshold
+    if value < 0 or value > 1:
+        raise ValueError("ANOMALY_THRESHOLD must be between 0 and 1")
+    _anomaly_threshold = value
 
 
 class ScoreRequest(BaseModel):
@@ -60,6 +77,22 @@ class ScoreRequest(BaseModel):
         validation_alias=AliasChoices("behavior_features", "behaviorFeatures", "BehaviorFeatures"),
     )
 
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized.startswith("/"):
+            raise ValueError("path must start with '/'")
+        return normalized
+
+    @field_validator("method")
+    @classmethod
+    def normalize_method(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if normalized not in {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}:
+            raise ValueError("unsupported HTTP method")
+        return normalized
+
 
 class ScoreResponse(BaseModel):
     anomaly_score: float
@@ -67,10 +100,22 @@ class ScoreResponse(BaseModel):
     reasons: list[str]
     degraded_mode: bool = False
     model_status: dict[str, Any] = Field(default_factory=dict)
+    feature_contributions: dict[str, float] = Field(default_factory=dict)
+
+
+class FeedbackRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    anomaly_threshold: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        validation_alias=AliasChoices("anomaly_threshold", "anomalyThreshold"),
+    )
 
 
 class ModelState:
     def __init__(self) -> None:
+        self._lock = RLock()
         self.network_model: Any | None = None
         self.network_meta: dict[str, Any] = {}
         self.behavior_models: dict[str, dict[str, Any]] = {}
@@ -78,29 +123,27 @@ class ModelState:
         self.load_errors: list[str] = []
 
     def load(self) -> None:
-        self.load_errors = []
-        self.network_model = None
-        self.network_meta = {}
-        self.behavior_models = {}
-        self.user_subject_map = {}
+        load_errors: list[str] = []
+        network_model: Any | None = None
+        network_meta: dict[str, Any] = {}
+        behavior_models: dict[str, dict[str, Any]] = {}
+        user_subject_map: dict[str, str] = {}
 
         if NETWORK_MODEL_PATH.exists() and NETWORK_META_PATH.exists():
             try:
-                self.network_model = joblib.load(NETWORK_MODEL_PATH)
+                network_model = joblib.load(NETWORK_MODEL_PATH)
                 with open(NETWORK_META_PATH, "r", encoding="utf-8") as f:
-                    self.network_meta = json.load(f)
+                    network_meta = json.load(f)
             except Exception as ex:
-                self.load_errors.append(f"network-model-load-failed:{type(ex).__name__}")
-                self.network_model = None
-                self.network_meta = {}
+                load_errors.append(f"network-model-load-failed:{type(ex).__name__}")
         else:
-            self.load_errors.append("network-model-files-missing")
+            load_errors.append("network-model-files-missing")
 
         if USER_SUBJECT_MAP_PATH.exists():
             with open(USER_SUBJECT_MAP_PATH, "r", encoding="utf-8") as f:
-                self.user_subject_map = json.load(f)
+                user_subject_map = json.load(f)
         else:
-            self.load_errors.append("behavior-user-map-missing")
+            load_errors.append("behavior-user-map-missing")
 
         if BEHAVIOR_DIR.exists():
             for p in BEHAVIOR_DIR.glob("behavior_*.joblib"):
@@ -108,30 +151,49 @@ class ModelState:
                     bundle = joblib.load(p)
                     subject = str(bundle.get("subject", "")).strip()
                     if subject:
-                        self.behavior_models[subject] = bundle
+                        behavior_models[subject] = bundle
                 except Exception as ex:
-                    self.load_errors.append(f"behavior-model-load-failed:{p.name}:{type(ex).__name__}")
+                    load_errors.append(f"behavior-model-load-failed:{p.name}:{type(ex).__name__}")
                     continue
         else:
-            self.load_errors.append("behavior-directory-missing")
+            load_errors.append("behavior-directory-missing")
+
+        with self._lock:
+            self.load_errors = load_errors
+            self.network_model = network_model
+            self.network_meta = network_meta
+            self.behavior_models = behavior_models
+            self.user_subject_map = user_subject_map
+
+    def snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "network_model": self.network_model,
+                "network_meta": dict(self.network_meta),
+                "behavior_models": dict(self.behavior_models),
+                "user_subject_map": dict(self.user_subject_map),
+                "load_errors": list(self.load_errors),
+            }
 
     @property
     def degraded(self) -> bool:
+        snapshot = self.snapshot()
         if not ALLOW_DEGRADED_SCORING:
-            return bool(self.load_errors)
-        return self.network_model is None
+            return bool(snapshot["load_errors"])
+        return snapshot["network_model"] is None
 
     def status(self) -> dict[str, Any]:
+        snapshot = self.snapshot()
         return {
-            "network_model_loaded": self.network_model is not None,
-            "behavior_models_loaded": len(self.behavior_models),
-            "user_subject_map_loaded": bool(self.user_subject_map),
+            "network_model_loaded": snapshot["network_model"] is not None,
+            "behavior_models_loaded": len(snapshot["behavior_models"]),
+            "user_subject_map_loaded": bool(snapshot["user_subject_map"]),
             "degraded_mode": self.degraded,
-            "load_errors": self.load_errors,
+            "load_errors": snapshot["load_errors"],
             "weights": {
                 "network_weight": NETWORK_WEIGHT,
                 "behavior_weight": BEHAVIOR_WEIGHT,
-                "anomaly_threshold": ANOMALY_THRESHOLD,
+                "anomaly_threshold": get_anomaly_threshold(),
             },
         }
 
@@ -223,21 +285,25 @@ def _feature_candidates(req: ScoreRequest) -> dict[str, float]:
     }
 
 
-def _network_score(req: ScoreRequest) -> tuple[float, list[str]]:
+def _network_score(req: ScoreRequest) -> tuple[float, list[str], dict[str, float]]:
     reasons: list[str] = []
+    contributions: dict[str, float] = {}
+    snapshot = state.snapshot()
     status = state.status()
+    network_model = snapshot["network_model"]
+    network_meta = snapshot["network_meta"]
 
-    if state.network_model is None or not state.network_meta:
+    if network_model is None or not network_meta:
         reasons.extend(["network-model-missing"])
         reasons.extend(status["load_errors"])
         if not ALLOW_DEGRADED_SCORING:
-            return 1.0, reasons
-        return 0.5, reasons
+            return 1.0, reasons, contributions
+        return 0.5, reasons, contributions
 
-    feature_cols = state.network_meta.get("feature_columns", [])
-    medians = state.network_meta.get("feature_medians", {})
+    feature_cols = network_meta.get("feature_columns", [])
+    medians = network_meta.get("feature_medians", {})
     if not feature_cols:
-        return 0.5, ["network-feature-metadata-missing"]
+        return 0.5, ["network-feature-metadata-missing"], contributions
 
     vector = [_safe_float(medians.get(c, 0.0)) for c in feature_cols]
     idx = {name.lower(): i for i, name in enumerate(feature_cols)}
@@ -251,8 +317,35 @@ def _network_score(req: ScoreRequest) -> tuple[float, list[str]]:
             mapped += 1
 
     x = pd.DataFrame([vector], columns=feature_cols, dtype=np.float64)
-    score_samples = float(state.network_model.score_samples(x)[0])
+    score_samples = float(network_model.score_samples(x)[0])
     network_score = 1.0 / (1.0 + np.exp(score_samples))
+
+    # --- XAI: per-feature anomaly contributions ---
+    readable_names = {
+        "flow pkts/s": "requests_per_minute",
+        "totlen fwd pkts": "payload_bytes",
+        "flow duration": "request_latency",
+        "pkt len mean": "avg_packet_size",
+        "flow iat mean": "inter_arrival_time",
+        "idle mean": "idle_time",
+        "source ip entropy": "source_ip_entropy",
+        "path depth surrogate": "path_depth",
+        "request burst surrogate": "burst_factor",
+    }
+    for col_name in feature_cols:
+        col_lower = col_name.lower()
+        median_val = _safe_float(medians.get(col_name, 0.0))
+        actual_val = vector[idx[col_lower]] if col_lower in idx else median_val
+        if median_val != 0:
+            deviation = abs(actual_val - median_val) / (abs(median_val) + 1e-9)
+        else:
+            deviation = abs(actual_val)
+        if deviation > 0.05:
+            label = readable_names.get(col_lower, col_lower)
+            contributions[label] = round(min(deviation, 5.0), 4)
+
+    # Sort and keep top-8 most impactful features
+    contributions = dict(sorted(contributions.items(), key=lambda kv: kv[1], reverse=True)[:8])
 
     if req.requests_per_minute > 120:
         reasons.append("frequency-spike")
@@ -264,15 +357,16 @@ def _network_score(req: ScoreRequest) -> tuple[float, list[str]]:
     if not reasons:
         reasons.append("network-model-evaluated")
 
-    return float(min(max(network_score, 0.0), 1.0)), reasons
+    return float(min(max(network_score, 0.0), 1.0)), reasons, contributions
 
 
 def _resolve_subject(req: ScoreRequest) -> str | None:
     if req.behavior_subject:
         return req.behavior_subject.strip()
 
-    if req.user_id in state.user_subject_map:
-        return str(state.user_subject_map[req.user_id]).strip()
+    user_subject_map = state.snapshot()["user_subject_map"]
+    if req.user_id in user_subject_map:
+        return str(user_subject_map[req.user_id]).strip()
 
     user = req.user_id.strip().lower()
     if user.startswith("s") and len(user) == 4 and user[1:].isdigit():
@@ -285,7 +379,7 @@ def _behavior_score(req: ScoreRequest) -> tuple[float | None, list[str]]:
     if not subject:
         return None, ["behavior-subject-unresolved"]
 
-    bundle = state.behavior_models.get(subject)
+    bundle = state.snapshot()["behavior_models"].get(subject)
     if not bundle:
         return None, [f"behavior-model-not-found:{subject}"]
 
@@ -325,14 +419,14 @@ def config() -> dict[str, Any]:
     return {
         "network_weight": NETWORK_WEIGHT,
         "behavior_weight": BEHAVIOR_WEIGHT,
-        "anomaly_threshold": ANOMALY_THRESHOLD,
+        "anomaly_threshold": get_anomaly_threshold(),
         "allow_degraded_scoring": ALLOW_DEGRADED_SCORING,
     }
 
 
 @app.post("/score", response_model=ScoreResponse)
 def score(req: ScoreRequest) -> ScoreResponse:
-    network_score, network_reasons = _network_score(req)
+    network_score, network_reasons, feature_contribs = _network_score(req)
     path_score, path_reasons = _path_risk(req.path, req.method, req.hour_of_day)
     behavior_score, behavior_reasons = _behavior_score(req)
 
@@ -341,8 +435,9 @@ def score(req: ScoreRequest) -> ScoreResponse:
     else:
         final_score = min(1.0, NETWORK_WEIGHT * network_score + BEHAVIOR_WEIGHT * behavior_score + path_score)
 
-    is_anomaly = final_score >= ANOMALY_THRESHOLD
-    reasons = network_reasons + path_reasons + behavior_reasons
+    threshold = get_anomaly_threshold()
+    is_anomaly = final_score >= threshold
+    reasons = _dedupe_reasons(network_reasons + path_reasons + behavior_reasons)
     if state.degraded:
         reasons.append("service-degraded-mode")
 
@@ -352,6 +447,7 @@ def score(req: ScoreRequest) -> ScoreResponse:
         reasons=reasons,
         degraded_mode=state.degraded,
         model_status=state.status(),
+        feature_contributions=feature_contribs,
     )
 
 
@@ -362,7 +458,7 @@ def debug_behavior_score(req: ScoreRequest) -> ScoreResponse:
     return ScoreResponse(
         anomaly_score=round(float(final_score), 6),
         is_anomaly=final_score >= 1.0,
-        reasons=behavior_reasons,
+        reasons=_dedupe_reasons(behavior_reasons),
         degraded_mode=state.degraded,
         model_status=state.status(),
     )
@@ -375,3 +471,34 @@ def reload_models() -> dict[str, Any]:
         "status": "reloaded",
         **state.status(),
     }
+
+
+@app.post("/feedback")
+def feedback(req: FeedbackRequest) -> dict[str, Any]:
+    changes: dict[str, Any] = {}
+    if req.anomaly_threshold is not None:
+        old = get_anomaly_threshold()
+        set_anomaly_threshold(req.anomaly_threshold)
+        changes["anomaly_threshold"] = {"old": old, "new": req.anomaly_threshold}
+    return {
+        "status": "applied" if changes else "no-changes",
+        "changes": changes,
+        "current_config": {
+            "network_weight": NETWORK_WEIGHT,
+            "behavior_weight": BEHAVIOR_WEIGHT,
+            "anomaly_threshold": get_anomaly_threshold(),
+            "allow_degraded_scoring": ALLOW_DEGRADED_SCORING,
+        },
+    }
+
+
+def _dedupe_reasons(reasons: list[str]) -> list[str]:
+    output: list[str] = []
+    seen: set[str] = set()
+    for reason in reasons:
+        key = reason.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        output.append(reason)
+    return output

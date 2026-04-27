@@ -21,6 +21,14 @@ export function getEvents() {
   return request("/api/events");
 }
 
+export function getHealth() {
+  return request("/health");
+}
+
+export function getAnalytics(hours = 24) {
+  return request(`/api/analytics?hours=${hours}`);
+}
+
 export function killSwitch(payload) {
   return request("/api/kill-switch", {
     method: "POST",
